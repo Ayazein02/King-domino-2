@@ -1,0 +1,81 @@
+import pandas as pd
+import numpy as np
+
+def compute_score(terrain_grid, crown_grid):
+    visited = np.zeros_like(terrain_grid, dtype=bool)
+    total_score = 0
+    rows, cols = terrain_grid.shape
+
+    def flood_fill(r, c, terrain_type):
+        if (r < 0 or r >= rows or c < 0 or c >= cols or
+            visited[r, c] or terrain_grid[r, c] != terrain_type):
+            return 0, 0
+
+        visited[r, c] = True
+        area_size = 1
+        crowns = crown_grid[r, c]
+
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            add_area, add_crowns = flood_fill(r + dr, c + dc, terrain_type)
+            area_size += add_area
+            crowns += add_crowns
+
+        return area_size, crowns
+
+    for r in range(rows):
+        for c in range(cols):
+            if not visited[r, c] and terrain_grid[r, c] != 'empty':
+                area_size, crowns = flood_fill(r, c, terrain_grid[r, c])
+                total_score += area_size * crowns
+
+    return total_score
+
+# --- MAIN CODE ---
+
+df = pd.read_excel(r"C:\Users\ayaal\OneDrive\Skrivebord\DAKI 24 1\GT's\Ground_truth_score.xlsx")
+
+# Sort properly (hvis nødvendigt)
+df = df.sort_values(by=["Filename", "Row", "Col"])
+
+all_images = df["Filename"].unique()
+
+for image_name in all_images:
+    image_df = df[df["Filename"] == image_name]
+
+    terrain_grid = np.full((5, 5), 'empty', dtype=object)
+    crown_grid = np.zeros((5, 5), dtype=int)
+
+    for _, row in image_df.iterrows():
+        r = int(row["Row"])
+        c = int(row["Col"])
+        terrain_grid[r, c] = str(row["Label"]).lower()
+        crown_value = row["Antal corwns"]
+        crown_grid[r, c] = int(crown_value) if not pd.isna(crown_value) else 0
+   
+
+    score = compute_score(terrain_grid, crown_grid)
+
+    print(f"=== {image_name} ===")
+    print("Terrain Grid:")
+    print(terrain_grid)
+    print("Crown Grid:")
+    print(crown_grid)
+
+    # --- BONUS RULES ---
+
+    if not np.any(terrain_grid == "empty"):
+        if terrain_grid[2, 2] == "home":
+            score += 10
+            print(" Bonus: No empty tiles and Home is centered (+10 points)")
+        else:
+            score += 5
+            print(" Bonus: No empty tiles (+5 points)")
+    else:
+        print(" No Bonus: Incomplete board")
+
+
+
+    print(f"🏰 Computed Final Score: {score} points")
+
+
+
